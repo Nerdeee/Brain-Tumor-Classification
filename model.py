@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-os.chdir("CSCI167Project")
 
 with open("X_train.pickle", "rb") as f:
     X_train = pickle.load(f)
