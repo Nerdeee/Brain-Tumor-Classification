@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import os
 from torch.utils.data import DataLoader, TensorDataset
 
-# Load data from pickle files
 pickle_folder = "pickle/"
 
 with open(pickle_folder + "X_train.pickle", "rb") as f:
@@ -22,18 +21,11 @@ with open(pickle_folder + "X_test.pickle", "rb") as f:
 with open(pickle_folder + "Y_test.pickle", "rb") as f:
     Y_test = pickle.load(f)
 
-# Convert data to PyTorch tensors and add channel dimension
 X_train = torch.tensor(X_train).float().unsqueeze(1)
 Y_train = torch.tensor(Y_train, dtype=torch.long)
 X_test = torch.tensor(X_test).float().unsqueeze(1)
 Y_test = torch.tensor(Y_test, dtype=torch.long)
 
-print(X_train.shape)
-print(X_test.shape)
-print('Y_train data type: ', Y_train.dtype)
-print('Y_train data type: ', Y_test.dtype)
-
-# Define the neural network
 class NeuralNet(nn.Module):
     def __init__(self):
         super(NeuralNet, self).__init__()
@@ -50,31 +42,31 @@ class NeuralNet(nn.Module):
         x = self.maxpool(torch.relu(self.conv1(x)))
         x = self.maxpool(torch.relu(self.conv2(x)))
         x = self.maxpool(torch.relu(self.conv3(x)))
-        x = x.view(x.size(0), -1)  # Flatten for fully connected layers
-        print(f"Flattened layer size: {x.shape}")
+        x = x.view(x.size(0), -1)
+        print(f"Flattened layer size: {x.shape}")   # use this to adjust the number of input channels going into the first linear layer
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = torch.relu(self.fc3(x))
         x = self.fc4(x)  # Output layer
         return x
 
+model = NeuralNet()
 # Create dataset and dataloaders
-train_dataset = TensorDataset(X_train, Y_train.long())
-test_dataset = TensorDataset(X_test, Y_test.long())
+train_dataset = TensorDataset(X_train, Y_train.float())
+test_dataset = TensorDataset(X_test, Y_test.float())
 
-batch_size = 32  # Adjust based on memory constraints
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-# Initialize the model, loss function, and optimizer
 model = NeuralNet()
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Function to calculate accuracy
 def calculate_accuracy(y_pred, y_true):
+    _, true = torch.max(y_true, 1)
     _, predicted = torch.max(y_pred, 1)
-    correct = (predicted == y_true).sum().item()
+    correct = (predicted == true).sum().item()
     accuracy = correct / y_true.size(0)
     return accuracy
 
@@ -93,7 +85,7 @@ for epoch in range(num_epochs):
         optimizer.step()
         
         epoch_loss += loss.item()
-        epoch_accuracy += (outputs.argmax(1) == batch_Y).sum().item()
+        epoch_accuracy += calculate_accuracy(outputs, batch_Y)
     
     epoch_loss /= len(train_loader)
     epoch_accuracy /= len(X_train)
@@ -110,7 +102,7 @@ with torch.no_grad():
         loss = criterion(outputs, batch_Y)
         
         test_loss += loss.item()
-        test_accuracy += (outputs.argmax(1) == batch_Y).sum().item()
+        test_accuracy += calculate_accuracy(outputs, batch_Y)
 
 test_loss /= len(test_loader)
 test_accuracy /= len(X_test)
