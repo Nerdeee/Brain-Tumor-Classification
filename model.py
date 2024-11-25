@@ -98,12 +98,8 @@ test_accuracy = 0.0
 
 with torch.no_grad():
     for batch_X, batch_Y in test_loader:
-        outputs = model(batch_X)
-        loss = criterion(outputs, batch_Y)
-        
-        test_loss += loss.item()
+        outputs = model(batch_X)        
         test_accuracy += calculate_accuracy(outputs, batch_Y)
 
-test_loss /= len(test_loader)
 test_accuracy /= len(X_test)
-print(f'Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy * 100:.2f}%')
+print(f'Test Accuracy: {test_accuracy * 100:.2f}%')
