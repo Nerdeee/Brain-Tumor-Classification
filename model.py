@@ -93,7 +93,6 @@ for epoch in range(num_epochs):
 
 # Testing loop
 model.eval()
-test_loss = 0.0
 test_accuracy = 0.0
 
 with torch.no_grad():
