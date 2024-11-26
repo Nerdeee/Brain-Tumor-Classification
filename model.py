@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
 
 pickle_folder = "pickle/"
 
@@ -43,7 +45,7 @@ class NeuralNet(nn.Module):
         x = self.maxpool(torch.relu(self.conv2(x)))
         x = self.maxpool(torch.relu(self.conv3(x)))
         x = x.view(x.size(0), -1)
-        print(f"Flattened layer size: {x.shape}")   # use this to adjust the number of input channels going into the first linear layer
+        #print(f"Flattened layer size: {x.shape}")   # use this to adjust the number of input channels going into the first linear layer
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = torch.relu(self.fc3(x))
@@ -60,7 +62,7 @@ test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 model = NeuralNet()
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 # Function to calculate accuracy
 def calculate_accuracy(y_pred, y_true):
@@ -89,7 +91,11 @@ for epoch in range(num_epochs):
     
     epoch_loss /= len(train_loader)
     epoch_accuracy /= len(X_train)
+    writer.add_scalar("Loss/epoch", epoch_loss, epoch)
+    writer.add_scalar("Accuracy/epoch", epoch_accuracy, epoch)
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy * 100:.2f}%')
+
+writer.close()
 
 # Testing loop
 model.eval()
@@ -101,4 +107,6 @@ with torch.no_grad():
         test_accuracy += calculate_accuracy(outputs, batch_Y)
 
 test_accuracy /= len(X_test)
+writer.add_scalar("Test Accuracy/epoch", test_accuracy, epoch)
 print(f'Test Accuracy: {test_accuracy * 100:.2f}%')
+writer.close()
