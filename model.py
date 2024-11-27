@@ -67,14 +67,38 @@ model = NeuralNet()
 train_dataset = TensorDataset(X_train, Y_train.float())
 test_dataset = TensorDataset(X_test, Y_test.float())
 
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
+bs = 16
+train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=bs, shuffle=False)
 
 learning_rate = 0.001
 
 model = NeuralNet().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+# Print model summary
+print(model)
+print(optimizer)
+print(criterion)
+print(f"Batch Size: {bs}")
+
+# Create a trial file
+def create_trial_file(trials_folder="trials/model1"):
+    trial_number = 1
+    while os.path.exists(trials_folder + f"trial_{trial_number}.txt"):
+        trial_number += 1
+    return trials_folder + f"trial_{trial_number}.txt"
+
+
+trial_file = create_trial_file()
+
+with open(trial_file, "w") as f:
+    f.write(f"Model architecture: {model}\n")
+    f.write(f"Optimizer: {optimizer}\n")
+    f.write(f"Criterion: {criterion}\n")
+    f.write(f"Batch Size: {bs}\n")
+f.close()
 
 # Function to calculate accuracy
 def calculate_accuracy(y_pred, y_true):
@@ -123,4 +147,10 @@ with torch.no_grad():
 test_accuracy /= len(X_test)
 writer.add_scalar(f"Test Accuracy/epoch with learning rate: {learning_rate}", test_accuracy, epoch)
 print(f'Test Accuracy: {test_accuracy * 100:.2f}%')
+
+# Write to trial file
+with open(trial_file, "a") as f:
+    f.write(f'Test Accuracy: {test_accuracy * 100:.2f}%')
+f.close()
+
 writer.close()
