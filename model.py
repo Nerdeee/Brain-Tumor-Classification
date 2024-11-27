@@ -36,45 +36,96 @@ Y_train = torch.tensor(Y_train, dtype=torch.long)
 X_test = torch.tensor(X_test).float().unsqueeze(1)
 Y_test = torch.tensor(Y_test, dtype=torch.long)
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class NeuralNet(nn.Module):
     def __init__(self):
         super(NeuralNet, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=512, kernel_size=2, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=2, stride=2, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=2, stride=2, padding=1)
-        self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=2, stride=2, padding=1)
-        self.conv5 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=2, stride=2, padding=1)
-        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.fc1 = nn.Linear(1152, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 128)
-        self.fc4 = nn.Linear(128, 4)  # Output layer
         
-        self.testfc1 = nn.Linear(128, 4)
+        # Convolutional layers
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, stride=1, padding=1)
+        self.bn1 = nn.BatchNorm2d(64)
+        
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(128)
+        
+        self.conv3 = nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm2d(256)
+        
+        self.conv4 = nn.Conv2d(in_channels=256, out_channels=512, kernel_size=3, stride=1, padding=1)
+        self.bn4 = nn.BatchNorm2d(512)
+        
+        # Global average pooling layer
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+        
+        # Fully connected layers
+        self.fc1 = nn.Linear(512, 128)
+        self.fc2 = nn.Linear(128, 4)  # Output layer for 4 classes
+        
+        # Dropout layer
+        self.dropout = nn.Dropout(0.5)
+
     def forward(self, x):
-        x = (torch.relu(self.conv1(x)))
-        x = self.maxpool(torch.relu(self.conv2(x)))
-        x = (torch.relu(self.conv3(x)))
-        x = self.maxpool(torch.relu(self.conv4(x)))
-        x = (torch.relu(self.conv5(x)))
-        x = x.view(x.size(0), -1)
-        # print(f"Flattened layer size: {x.shape}")   # use this to adjust the number of input channels going into the first linear layer
-        x = self.testfc1(x)
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.max_pool2d(x, kernel_size=2, stride=2)
+        
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.max_pool2d(x, kernel_size=2, stride=2)
+        
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = F.max_pool2d(x, kernel_size=2, stride=2)
+        
+        x = F.relu(self.bn4(self.conv4(x)))
+        x = F.max_pool2d(x, kernel_size=2, stride=2)
+        
+        x = self.global_avg_pool(x)
+        x = torch.flatten(x, 1)  # Flatten for fully connected layers
+        
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)  # Apply dropout
+        x = self.fc2(x)
         return x
+
 
 model = NeuralNet()
 # Create dataset and dataloaders
 train_dataset = TensorDataset(X_train, Y_train.float())
 test_dataset = TensorDataset(X_test, Y_test.float())
 
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
+bs = 32
+train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=bs, shuffle=False)
 
 learning_rate = 0.001
 
 model = NeuralNet().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+# Print model summary
+print(model)
+print(optimizer)
+print(criterion)
+print(f"Batch Size: {bs}")
+
+# Create a trial file
+def create_trial_file(trials_folder="trials/model2"):
+    trial_number = 1
+    while os.path.exists(trials_folder + f"trial_{trial_number}.txt"):
+        trial_number += 1
+    return trials_folder + f"trial_{trial_number}.txt"
+
+
+trial_file = create_trial_file()
+
+with open(trial_file, "w") as f:
+    f.write(f"Model architecture: {model}\n")
+    f.write(f"Optimizer: {optimizer}\n")
+    f.write(f"Criterion: {criterion}\n")
+f.close()
+
 
 # Function to calculate accuracy
 def calculate_accuracy(y_pred, y_true):
@@ -123,4 +174,10 @@ with torch.no_grad():
 test_accuracy /= len(X_test)
 writer.add_scalar(f"Test Accuracy/epoch with learning rate: {learning_rate}", test_accuracy, epoch)
 print(f'Test Accuracy: {test_accuracy * 100:.2f}%')
+
+# Write to trial file
+with open(trial_file, "a") as f:
+    f.write(f'Test Accuracy: {test_accuracy * 100:.2f}%')
+f.close()
+
 writer.close()
