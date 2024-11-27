@@ -7,6 +7,14 @@ import matplotlib.pyplot as plt
 import os
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
+
+if torch.cuda.is_available():
+    print(f"\nGPU: {torch.cuda.get_device_name(0)} is available")
+else:
+    print('\nNo GPU available')
+
+device = torch.device("cuda")
+
 writer = SummaryWriter()
 
 pickle_folder = "pickle/"
@@ -31,26 +39,27 @@ Y_test = torch.tensor(Y_test, dtype=torch.long)
 class NeuralNet(nn.Module):
     def __init__(self):
         super(NeuralNet, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=512, kernel_size=3, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, stride=2, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, stride=2, padding=1)
-        self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, stride=2, padding=1)
-        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=1, padding=0)
-        self.fc1 = nn.Linear(43520, 512)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=512, kernel_size=2, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=2, stride=2, padding=1)
+        self.conv3 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=2, stride=2, padding=1)
+        self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=2, stride=2, padding=1)
+        self.conv5 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=2, stride=2, padding=1)
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        self.fc1 = nn.Linear(1152, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, 128)
         self.fc4 = nn.Linear(128, 4)  # Output layer
-
+        
+        self.testfc1 = nn.Linear(1152, 4)
     def forward(self, x):
-        x = self.maxpool(torch.relu(self.conv1(x)))
+        x = (torch.relu(self.conv1(x)))
         x = self.maxpool(torch.relu(self.conv2(x)))
-        x = self.maxpool(torch.relu(self.conv3(x)))
+        x = (torch.relu(self.conv3(x)))
+        x = self.maxpool(torch.relu(self.conv4(x)))
+        x = (torch.relu(self.conv5(x)))
         x = x.view(x.size(0), -1)
         #print(f"Flattened layer size: {x.shape}")   # use this to adjust the number of input channels going into the first linear layer
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = torch.relu(self.fc3(x))
-        x = self.fc4(x)  # Output layer
+        x = self.testfc1(x)
         return x
 
 model = NeuralNet()
@@ -58,12 +67,12 @@ model = NeuralNet()
 train_dataset = TensorDataset(X_train, Y_train.float())
 test_dataset = TensorDataset(X_test, Y_test.float())
 
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
 
 learning_rate = 0.01
 
-model = NeuralNet()
+model = NeuralNet().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -76,13 +85,14 @@ def calculate_accuracy(y_pred, y_true):
     return accuracy
 
 # Training loop
-num_epochs = 10
+num_epochs = 50
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0.0
     epoch_accuracy = 0.0
     
     for batch_X, batch_Y in train_loader:
+        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
         optimizer.zero_grad()
         outputs = model(batch_X)
         loss = criterion(outputs, batch_Y)
@@ -106,6 +116,7 @@ test_accuracy = 0.0
 
 with torch.no_grad():
     for batch_X, batch_Y in test_loader:
+        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
         outputs = model(batch_X)        
         test_accuracy += calculate_accuracy(outputs, batch_Y)
 
