@@ -60,9 +60,11 @@ test_dataset = TensorDataset(X_test, Y_test.float())
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
+learning_rate = 0.01
+
 model = NeuralNet()
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # Function to calculate accuracy
 def calculate_accuracy(y_pred, y_true):
@@ -91,8 +93,8 @@ for epoch in range(num_epochs):
     
     epoch_loss /= len(train_loader)
     epoch_accuracy /= len(X_train)
-    writer.add_scalar("Loss/epoch", epoch_loss, epoch)
-    writer.add_scalar("Accuracy/epoch", epoch_accuracy, epoch)
+    writer.add_scalar("Loss/epoch with learning rate: {learning_rate}", epoch_loss, epoch)
+    writer.add_scalar("Accuracy/epoch  with learning rate: {learning_rate}", epoch_accuracy, epoch)
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy * 100:.2f}%')
 
 writer.close()
@@ -107,6 +109,6 @@ with torch.no_grad():
         test_accuracy += calculate_accuracy(outputs, batch_Y)
 
 test_accuracy /= len(X_test)
-writer.add_scalar("Test Accuracy/epoch", test_accuracy, epoch)
+writer.add_scalar(f"Test Accuracy/epoch with learning rate: {learning_rate}", test_accuracy, epoch)
 print(f'Test Accuracy: {test_accuracy * 100:.2f}%')
 writer.close()
