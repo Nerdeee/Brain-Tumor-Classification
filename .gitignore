@@ -1,5 +1,6 @@
 /images
 /pickle
+/trials
 runs/*
 
 # Byte-compiled / optimized / DLL files
