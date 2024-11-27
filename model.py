@@ -31,9 +31,6 @@ with open(pickle_folder + "X_test.pickle", "rb") as f:
 with open(pickle_folder + "Y_test.pickle", "rb") as f:
     Y_test = pickle.load(f)
 
-
-
-
 X_train = torch.tensor(X_train).float().unsqueeze(1)
 Y_train = torch.tensor(Y_train, dtype=torch.long)
 X_test = torch.tensor(X_test).float().unsqueeze(1)
