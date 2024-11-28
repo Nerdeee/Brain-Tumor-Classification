@@ -139,7 +139,34 @@ def calculate_accuracy(y_pred, y_true):
     predicted = torch.argmax(y_pred, dim=1)  # Get predicted class
     correct = (predicted == y_true).sum().item()
     accuracy = correct / y_true.size(0)
+
+    print("y_pred:", torch.argmax(y_pred, dim=1))
+    print("y_true:", y_true)
     return accuracy
+
+
+
+import torch
+
+def calculate_metrics(y_pred, y_true):
+    # Convert predictions to class indices (max value)
+    predicted = torch.argmax(y_pred, dim=1)
+
+    # Compute confusion matrix components
+    tp = ((predicted == 1) & (y_true == 1)).sum().item()  # True Positive
+    tn = ((predicted == 0) & (y_true == 0)).sum().item()  # True Negative
+    fp = ((predicted == 1) & (y_true == 0)).sum().item()  # False Positive
+    fn = ((predicted == 0) & (y_true == 1)).sum().item()  # False Negative
+
+    # Calculate metrics
+    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    return fp, tp, fn, tn, accuracy, precision, recall, specificity, f1
+
 
 
 # Training loop
