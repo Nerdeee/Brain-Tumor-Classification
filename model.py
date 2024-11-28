@@ -142,13 +142,38 @@ def calculate_accuracy(y_pred, y_true):
     accuracy = correct / y_true.size(0)
     return accuracy
 
+# Accuracy calculation function
+
+
+def calculate_metrics(y_pred, y_true):
+    # Convert predictions to class indices (max value)
+    predicted = torch.argmax(y_pred, dim=1)
+
+    # Compute confusion matrix components
+    tp = ((predicted == 1) & (y_true == 1)).sum().item()  # True Positive
+    tn = ((predicted == 0) & (y_true == 0)).sum().item()  # True Negative
+    fp = ((predicted == 1) & (y_true == 0)).sum().item()  # False Positive
+    fn = ((predicted == 0) & (y_true == 1)).sum().item()  # False Negative
+
+    # Calculate metrics
+    accuracy = (tp + tn) / (tp + tn + fp +
+                            fn) if (tp + tn + fp + fn) > 0 else 0
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision +
+                                     recall) if (precision + recall) > 0 else 0
+
+    return fp, tp, fn, tn, accuracy, precision, recall, specificity, f1
+
 
 # Training loop
-num_epochs = 7
+num_epochs = 50
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0.0
-    epoch_accuracy = 0.0
+    epoch_metrics = {'accuracy': 0, 'precision': 0,
+                     'recall': 0, 'specificity': 0, 'f1': 0}
 
     for batch_X, batch_Y in train_loader:
         batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
@@ -159,37 +184,89 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         epoch_loss += loss.item()
-        epoch_accuracy += calculate_accuracy(outputs, batch_Y)
 
+        # Calculate and aggregate metrics for the current batch
+        fp, tp, fn, tn, accuracy, precision, recall, specificity, f1 = calculate_metrics(
+            outputs, batch_Y)
+        epoch_metrics['accuracy'] += accuracy
+        epoch_metrics['precision'] += precision
+        epoch_metrics['recall'] += recall
+        epoch_metrics['specificity'] += specificity
+        epoch_metrics['f1'] += f1
+
+    # Average metrics over the dataset
     epoch_loss /= len(train_loader)
-    epoch_accuracy /= len(train_loader)
-    writer.add_scalar("Loss/epoch", epoch_loss, epoch)
-    writer.add_scalar("Accuracy/epoch", epoch_accuracy, epoch)
-    print(
-        f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy * 100:.2f}%')
+    epoch_metrics = {k: v / len(train_loader)
+                     for k, v in epoch_metrics.items()}
 
+    # Log metrics using TensorBoard
+    writer.add_scalar("Loss/epoch", epoch_loss, epoch)
+    writer.add_scalar("Accuracy/epoch", epoch_metrics['accuracy'], epoch)
+    writer.add_scalar("Precision/epoch", epoch_metrics['precision'], epoch)
+    writer.add_scalar("Recall/epoch", epoch_metrics['recall'], epoch)
+    writer.add_scalar("Specificity/epoch", epoch_metrics['specificity'], epoch)
+    writer.add_scalar("F1/epoch", epoch_metrics['f1'], epoch)
+
+   # Print metrics
+    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, '
+          f'Accuracy: {epoch_metrics["accuracy"]*100:.2f}%, '
+          f'Precision: {epoch_metrics["precision"]:.4f}, '
+          f'Recall: {epoch_metrics["recall"]:.4f}, '
+          f'Specificity: {epoch_metrics["specificity"]:.4f}, '
+          f'F1 Score: {epoch_metrics["f1"]:.4f}')
+
+    # Save metrics to trial file
     with open(trial_file, "a") as f:
-        f.write(
-            f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy * 100:.2f}%\n')
+        f.write(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, '
+                f'Accuracy: {epoch_metrics["accuracy"]*100:.2f}%, '
+                f'Precision: {epoch_metrics["precision"]:.4f}, '
+                f'Recall: {epoch_metrics["recall"]:.4f}, '
+                f'Specificity: {epoch_metrics["specificity"]:.4f}, '
+                f'F1 Score: {epoch_metrics["f1"]:.4f}\n')
+
 
 writer.close()
 
 # Testing loop
 model.eval()
-test_accuracy = 0.0
+test_metrics = {'accuracy': 0, 'precision': 0,
+                'recall': 0, 'specificity': 0, 'f1': 0}
 
 with torch.no_grad():
     for batch_X, batch_Y in test_loader:
         batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
         outputs = model(batch_X)
-        test_accuracy += calculate_accuracy(outputs, batch_Y)
 
-test_accuracy /= len(test_loader)
-writer.add_scalar("Test Accuracy", test_accuracy, num_epochs)
-print(f'Test Accuracy: {test_accuracy * 100:.2f}%')
+        fp, tp, fn, tn, accuracy, precision, recall, specificity, f1 = calculate_metrics(
+            outputs, batch_Y)
+        test_metrics['accuracy'] += accuracy
+        test_metrics['precision'] += precision
+        test_metrics['recall'] += recall
+        test_metrics['specificity'] += specificity
+        test_metrics['f1'] += f1
+
+# Average metrics over the test set
+test_metrics = {k: v / len(test_loader) for k, v in test_metrics.items()}
+
+# Log metrics for testing
+writer.add_scalar("Test Accuracy", test_metrics['accuracy'], num_epochs)
+writer.add_scalar("Test Precision", test_metrics['precision'], num_epochs)
+writer.add_scalar("Test Recall", test_metrics['recall'], num_epochs)
+writer.add_scalar("Test Specificity", test_metrics['specificity'], num_epochs)
+writer.add_scalar("Test F1", test_metrics['f1'], num_epochs)
+
+# Print and save test metrics
+print(f'Test Accuracy: {test_metrics["accuracy"]*100:.2f}%, '
+      f'Test Precision: {test_metrics["precision"]:.4f}, '
+      f'Test Recall: {test_metrics["recall"]:.4f}, '
+      f'Test Specificity: {test_metrics["specificity"]:.4f}, '
+      f'Test F1 Score: {test_metrics["f1"]:.4f}')
 
 with open(trial_file, "a") as f:
-    f.write(f'Test Accuracy: {test_accuracy * 100:.2f}%\n')
-f.close()
+    f.write(f'Test Accuracy: {test_metrics["accuracy"]*100:.2f}%, '
+            f'Test Precision: {test_metrics["precision"]:.4f}, '
+            f'Test Recall: {test_metrics["recall"]:.4f}, '
+            f'Test Specificity: {test_metrics["specificity"]:.4f}, '
+            f'Test F1 Score: {test_metrics["f1"]:.4f}\n')
 
 writer.close()
