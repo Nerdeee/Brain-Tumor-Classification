@@ -1,64 +1,85 @@
 import os
-import pickle
+import torch
 import numpy as np
-import cv2  # Use OpenCV to handle image resizing if needed
+import pickle
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from PIL import Image
 
-# Define the paths
-data_dir = "archive/"
-training_dir = os.path.join(data_dir, "Training")
-testing_dir = os.path.join(data_dir, "Testing")
-classes_to_include = ["meningioma", "notumor"]  # Relevant classes
-label_map = {"meningioma": 1, "notumor": 0}  # Binary labels
+# Set the root directory for the dataset
+root_dir = 'archive'
 
-def load_images_from_directory(directory, classes_to_include, label_map, target_size=(128, 128)):
-    """
-    Loads images and their corresponding labels from a directory.
-    Args:
-        directory: Directory containing class subfolders.
-        classes_to_include: List of class subfolders to include.
-        label_map: Mapping of class names to labels.
-        target_size: Target size for image resizing.
-    Returns:
-        (images, labels): Tuple of lists containing image data and corresponding labels.
-    """
-    images = []
-    labels = []
-    
-    for class_name in classes_to_include:
-        class_dir = os.path.join(directory, class_name)
+# Image preprocessing transform (resizing to a standard size and normalizing)
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Resize all images to 224x224
+    transforms.Grayscale(num_output_channels=1),  # Convert to grayscale (if necessary)
+    transforms.ToTensor(),  # Convert image to tensor
+    transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize pixel values to [0, 1]
+])
+
+# Initialize lists to store images and labels
+images = []
+labels = []
+
+# Define class names and label mapping
+class_names = ['glioma', 'meningioma', 'notumor', 'pituitary']
+label_map = {name: i for i, name in enumerate(class_names)}
+
+# Loop over the subdirectories in 'Training' and 'Testing' folders
+for split in ['Training', 'Testing']:
+    for class_name in class_names:
+        class_dir = os.path.join(root_dir, split, class_name)
+        label = label_map[class_name]
+        
+        # Loop through all images in the class directory
         for img_name in os.listdir(class_dir):
             img_path = os.path.join(class_dir, img_name)
-            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # Read in grayscale
-            img = cv2.resize(img, target_size)  # Resize to consistent size
-            images.append(img)
-            labels.append(label_map[class_name])
-    
-    return np.array(images), np.array(labels)
+            try:
+                # Open and preprocess the image
+                img = Image.open(img_path).convert('RGB')
+                img = transform(img)
+                images.append(img)
+                labels.append(label)
+            except Exception as e:
+                print(f"Error processing image {img_path}: {e}")
+        
+# Convert lists to tensors
+X = torch.stack(images)
+y = torch.tensor(labels, dtype=torch.long)
 
-# Load and process training data
-X_train, Y_train = load_images_from_directory(training_dir, classes_to_include, label_map)
+# Manually split the data into train and test sets (80% train, 20% test)
+# Shuffle the indices for random splitting
+num_samples = len(X)
+indices = torch.randperm(num_samples).tolist()
 
-# Load and process testing data
-X_test, Y_test = load_images_from_directory(testing_dir, classes_to_include, label_map)
+# 80% for training and 20% for testing
+split_index = int(0.8 * num_samples)
+train_indices = indices[:split_index]
+test_indices = indices[split_index:]
 
-# Normalize pixel values to [0, 1]
-X_train = X_train / 255.0
-X_test = X_test / 255.0
+# Use the indices to split the data
+X_train = X[train_indices]
+y_train = y[train_indices]
+X_test = X[test_indices]
+y_test = y[test_indices]
 
-# Save processed data to pickle files
-pickle_folder = "meningioma-pickle/"
+# Save the data as pickle files
+pickle_folder = 'pickle/'
+
+# Ensure the folder exists
 os.makedirs(pickle_folder, exist_ok=True)
 
-with open(os.path.join(pickle_folder, "X_train.pickle"), "wb") as f:
-    pickle.dump(X_train, f)
+# Save training and testing data
+with open(os.path.join(pickle_folder, 'X_train.pickle'), 'wb') as f:
+    pickle.dump(X_train.numpy(), f)
 
-with open(os.path.join(pickle_folder, "Y_train.pickle"), "wb") as f:
-    pickle.dump(Y_train, f)
+with open(os.path.join(pickle_folder, 'Y_train.pickle'), 'wb') as f:
+    pickle.dump(y_train.numpy(), f)
 
-with open(os.path.join(pickle_folder, "X_test.pickle"), "wb") as f:
-    pickle.dump(X_test, f)
+with open(os.path.join(pickle_folder, 'X_test.pickle'), 'wb') as f:
+    pickle.dump(X_test.numpy(), f)
 
-with open(os.path.join(pickle_folder, "Y_test.pickle"), "wb") as f:
-    pickle.dump(Y_test, f)
+with open(os.path.join(pickle_folder, 'Y_test.pickle'), 'wb') as f:
+    pickle.dump(y_test.numpy(), f)
 
-print("Pickle files for meningioma and notumor saved successfully!")
+print("Pickle files have been created successfully!")

@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pickle
-import numpy as np
-import matplotlib.pyplot as plt
 import os
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
@@ -68,7 +66,7 @@ class NeuralNet(nn.Module):
 
         # Fully connected layers
         self.fc1 = nn.Linear(512, 128)
-        self.fc2 = nn.Linear(128, 2)  # Output layer for 2 classes
+        self.fc2 = nn.Linear(128, 4)  # Output layer for 4 classes
 
         # Dropout layer
         self.dropout = nn.Dropout(0.5)
@@ -105,7 +103,8 @@ bs = 96
 train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=bs, shuffle=False)
 
-learning_rate = 0.001
+learning_rate = 0.0001
+# This loss function works for multi-class classification
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -118,7 +117,7 @@ print(f"Batch Size: {bs}")
 # Create a trial file for logs
 
 
-def create_trial_file(trials_folder="trials/meningioma-model2"):
+def create_trial_file(trials_folder="trials/four-class-model2"):
     trial_number = 1
     while os.path.exists(trials_folder + f"/trial_{trial_number}.txt"):
         trial_number += 1
