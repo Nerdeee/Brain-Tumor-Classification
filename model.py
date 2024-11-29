@@ -50,7 +50,7 @@ class NeuralNet(nn.Module):
         self.fc3 = nn.Linear(256, 128)
         self.fc4 = nn.Linear(128, 4)  # Output layer
         
-        self.testfc1 = nn.Linear(1152, 4)
+        self.testfc1 = nn.Linear(128, 4)
     def forward(self, x):
         x = (torch.relu(self.conv1(x)))
         x = self.maxpool(torch.relu(self.conv2(x)))
@@ -67,14 +67,14 @@ model = NeuralNet()
 train_dataset = TensorDataset(X_train, Y_train.float())
 test_dataset = TensorDataset(X_test, Y_test.float())
 
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-learning_rate = 0.01
+learning_rate = 0.001
 
 model = NeuralNet().to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
 # Function to calculate accuracy
 def calculate_accuracy(y_pred, y_true):
@@ -85,7 +85,7 @@ def calculate_accuracy(y_pred, y_true):
     return accuracy
 
 # Training loop
-num_epochs = 50
+num_epochs = 75
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0.0
