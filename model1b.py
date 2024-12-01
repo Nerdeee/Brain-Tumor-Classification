@@ -120,13 +120,16 @@ def calculate_metrics(y_pred, y_true):
 
     return fp, tp, fn, tn, accuracy, precision, recall, specificity, f1
 
-# Training loop
+# Training loop with detailed metrics tracked after each epoch
 num_epochs = 50
 for epoch in range(num_epochs):
+    # Initialize metrics for the epoch
+    train_metrics = {'accuracy': 0, 'precision': 0, 'recall': 0, 'specificity': 0, 'f1': 0}
+    test_metrics = {'accuracy': 0, 'precision': 0, 'recall': 0, 'specificity': 0, 'f1': 0}
+    
+    # Training phase
     model.train()
     epoch_loss = 0.0
-    epoch_metrics = {'accuracy': 0, 'precision': 0, 'recall': 0, 'specificity': 0, 'f1': 0}
-
     for batch_X, batch_Y in train_loader:
         batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
         optimizer.zero_grad()
@@ -134,85 +137,57 @@ for epoch in range(num_epochs):
         loss = criterion(outputs, batch_Y)
         loss.backward()
         optimizer.step()
-
         epoch_loss += loss.item()
 
-        # Calculate and aggregate metrics for the current batch
+        # Calculate metrics for the current batch
         fp, tp, fn, tn, accuracy, precision, recall, specificity, f1 = calculate_metrics(outputs, batch_Y)
-        epoch_metrics['accuracy'] += accuracy
-        epoch_metrics['precision'] += precision
-        epoch_metrics['recall'] += recall
-        epoch_metrics['specificity'] += specificity
-        epoch_metrics['f1'] += f1
+        train_metrics['accuracy'] += accuracy
+        train_metrics['precision'] += precision
+        train_metrics['recall'] += recall
+        train_metrics['specificity'] += specificity
+        train_metrics['f1'] += f1
 
-    # Average metrics over the dataset
+    # Average metrics over the training set
     epoch_loss /= len(train_loader)
-    epoch_metrics = {k: v / len(train_loader) for k, v in epoch_metrics.items()}
+    train_metrics = {k: v / len(train_loader) for k, v in train_metrics.items()}
 
-    # Log metrics using TensorBoard
-    writer.add_scalar("Loss/epoch", epoch_loss, epoch)
-    writer.add_scalar("Accuracy/epoch", epoch_metrics['accuracy'], epoch)
-    writer.add_scalar("Precision/epoch", epoch_metrics['precision'], epoch)
-    writer.add_scalar("Recall/epoch", epoch_metrics['recall'], epoch)
-    writer.add_scalar("Specificity/epoch", epoch_metrics['specificity'], epoch)
-    writer.add_scalar("F1/epoch", epoch_metrics['f1'], epoch)
+    # Testing phase
+    model.eval()
+    with torch.no_grad():
+        for batch_X, batch_Y in test_loader:
+            batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
+            outputs = model(batch_X)
 
-    # Print metrics
-    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, '
-          f'Accuracy: {epoch_metrics["accuracy"]*100:.2f}%, '
-          f'Precision: {epoch_metrics["precision"]:.4f}, '
-          f'Recall: {epoch_metrics["recall"]:.4f}, '
-          f'Specificity: {epoch_metrics["specificity"]:.4f}, '
-          f'F1 Score: {epoch_metrics["f1"]:.4f}')
+            # Calculate metrics for the current batch
+            fp, tp, fn, tn, accuracy, precision, recall, specificity, f1 = calculate_metrics(outputs, batch_Y)
+            test_metrics['accuracy'] += accuracy
+            test_metrics['precision'] += precision
+            test_metrics['recall'] += recall
+            test_metrics['specificity'] += specificity
+            test_metrics['f1'] += f1
 
-    # Save metrics to trial file
-    with open(trial_file, "a") as f:
-        f.write(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}, '
-                f'Accuracy: {epoch_metrics["accuracy"]*100:.2f}%, '
-                f'Precision: {epoch_metrics["precision"]:.4f}, '
-                f'Recall: {epoch_metrics["recall"]:.4f}, '
-                f'Specificity: {epoch_metrics["specificity"]:.4f}, '
-                f'F1 Score: {epoch_metrics["f1"]:.4f}\n')
+    # Average metrics over the test set
+    test_metrics = {k: v / len(test_loader) for k, v in test_metrics.items()}
 
-# Testing loop
-model.eval()
-test_metrics = {'accuracy': 0, 'precision': 0, 'recall': 0, 'specificity': 0, 'f1': 0}
+    # Log metrics to TensorBoard for training
+    writer.add_scalar("Train/Loss", epoch_loss, epoch)
+    for metric_name, metric_value in train_metrics.items():
+        writer.add_scalar(f"Train/{metric_name.capitalize()}", metric_value, epoch)
 
-with torch.no_grad():
-    for batch_X, batch_Y in test_loader:
-        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
-        outputs = model(batch_X)
+    # Log metrics to TensorBoard for testing
+    for metric_name, metric_value in test_metrics.items():
+        writer.add_scalar(f"Test/{metric_name.capitalize()}", metric_value, epoch)
 
-        # Calculate and aggregate metrics for the current batch
-        fp, tp, fn, tn, accuracy, precision, recall, specificity, f1 = calculate_metrics(outputs, batch_Y)
-        test_metrics['accuracy'] += accuracy
-        test_metrics['precision'] += precision
-        test_metrics['recall'] += recall
-        test_metrics['specificity'] += specificity
-        test_metrics['f1'] += f1
+    # Print epoch results
+    print(f'Epoch [{epoch+1}/{num_epochs}], '
+          f'Loss: {epoch_loss:.4f}, '
+          f'Train Accuracy: {train_metrics["accuracy"]*100:.2f}%, '
+          f'Test Accuracy: {test_metrics["accuracy"]*100:.2f}%, '
+          f'Train Recall: {train_metrics["recall"]:.4f}, '
+          f'Test Recall: {test_metrics["recall"]:.4f}, '
+          f'Train F1 Score: {train_metrics["f1"]:.4f}, '
+          f'Test F1 Score: {test_metrics["f1"]:.4f}')
 
-# Average metrics over the test set
-test_metrics = {k: v / len(test_loader) for k, v in test_metrics.items()}
-
-# Log metrics for testing
-writer.add_scalar("Test Accuracy", test_metrics['accuracy'], num_epochs)
-writer.add_scalar("Test Precision", test_metrics['precision'], num_epochs)
-writer.add_scalar("Test Recall", test_metrics['recall'], num_epochs)
-writer.add_scalar("Test Specificity", test_metrics['specificity'], num_epochs)
-writer.add_scalar("Test F1", test_metrics['f1'], num_epochs)
-
-# Print and save test metrics
-print(f'Test Accuracy: {test_metrics["accuracy"]*100:.2f}%, '
-      f'Test Precision: {test_metrics["precision"]:.4f}, '
-      f'Test Recall: {test_metrics["recall"]:.4f}, '
-      f'Test Specificity: {test_metrics["specificity"]:.4f}, '
-      f'Test F1 Score: {test_metrics["f1"]:.4f}')
-
-with open(trial_file, "a") as f:
-    f.write(f'Test Accuracy: {test_metrics["accuracy"]*100:.2f}%, '
-            f'Test Precision: {test_metrics["precision"]:.4f}, '
-            f'Test Recall: {test_metrics["recall"]:.4f}, '
-            f'Test Specificity: {test_metrics["specificity"]:.4f}, '
-            f'Test F1 Score: {test_metrics["f1"]:.4f}\n')
-
+# Close the writer after training is complete
 writer.close()
+
