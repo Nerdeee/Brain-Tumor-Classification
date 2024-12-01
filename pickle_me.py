@@ -12,7 +12,7 @@ root_dir = 'archive'
 # Image preprocessing transform (resizing to a standard size and normalizing)
 transform = transforms.Compose([
     transforms.Resize((224, 224)),  # Resize all images to 224x224
-    transforms.Grayscale(num_output_channels=1),  # Convert to grayscale (if necessary)
+    transforms.Grayscale(num_output_channels=1),  # Convert to grayscale 
     transforms.ToTensor(),  # Convert image to tensor
     transforms.Normalize(mean=[0.5], std=[0.5])  # Normalize pixel values to [0, 1]
 ])
