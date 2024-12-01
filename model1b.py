@@ -47,10 +47,10 @@ class NeuralNet(nn.Module):
         self.conv4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=2, stride=2, padding=1)
         self.conv5 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=2, stride=2, padding=1)
         self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.fc1 = nn.Linear(1152, 512)
-        self.fc2 = nn.Linear(512, 256)
-        self.fc3 = nn.Linear(256, 128)
-        self.fc4 = nn.Linear(128, 4)  # Output layer
+        # self.fc1 = nn.Linear(1152, 512)
+        # self.fc2 = nn.Linear(512, 256)
+        # self.fc3 = nn.Linear(256, 128)
+        # self.fc4 = nn.Linear(128, 4)  # Output layer
         
         self.testfc1 = nn.Linear(128, 4)
     def forward(self, x):
