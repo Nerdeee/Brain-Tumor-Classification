@@ -8,36 +8,40 @@ from torch.utils.tensorboard import SummaryWriter
 
 if torch.cuda.is_available():
     print(f"\nGPU: {torch.cuda.get_device_name(0)} is available")
+    device = torch.device("cuda")
 else:
     print('\nNo GPU available')
-
-device = torch.device("cuda")
+    device = torch.device("cpu")
 
 writer = SummaryWriter()
 
-pickle_folder = "meningioma-pickle/"
+pickle_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pickle')
 
 # Load pickled datasets
-with open(pickle_folder + "X_train.pickle", "rb") as f:
+with open(pickle_folder + "/X_train.pickle", "rb") as f:
     X_train = pickle.load(f)
-
-with open(pickle_folder + "Y_train.pickle", "rb") as f:
+with open(pickle_folder + "/Y_train.pickle", "rb") as f:
     Y_train = pickle.load(f)
-
-with open(pickle_folder + "X_test.pickle", "rb") as f:
+with open(pickle_folder + "/X_test.pickle", "rb") as f:
     X_test = pickle.load(f)
-
-with open(pickle_folder + "Y_test.pickle", "rb") as f:
+with open(pickle_folder + "/Y_test.pickle", "rb") as f:
     Y_test = pickle.load(f)
 
 # Prepare data as tensors
-X_train = torch.tensor(X_train).float().unsqueeze(1)  # Add channel dimension
+X_train = torch.tensor(X_train).float()
+X_test = torch.tensor(X_test).float()
+
+# Check if the data already has a channel dimension (e.g., (N, H, W))
+if X_train.ndimension() == 3:  # (N, H, W)
+    X_train = X_train.unsqueeze(1)  # Add channel dimension (N, 1, H, W)
+if X_test.ndimension() == 3:  # (N, H, W)
+    X_test = X_test.unsqueeze(1)  # Add channel dimension (N, 1, H, W)
+
 # Ensure long type for classification
 Y_train = torch.tensor(Y_train, dtype=torch.long)
-X_test = torch.tensor(X_test).float().unsqueeze(1)
 Y_test = torch.tensor(Y_test, dtype=torch.long)
 
-# Define the neural network
+
 class NeuralNet(nn.Module):
     def __init__(self):
         super(NeuralNet, self).__init__()
@@ -86,10 +90,9 @@ class NeuralNet(nn.Module):
         x = torch.flatten(x, 1)  # Flatten for fully connected layers
 
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)  # Apply dropout
+        x = self.dropout(x)  # Dropout
         x = self.fc2(x)
         return x
-
 
 model = NeuralNet().to(device)
 
@@ -102,7 +105,6 @@ train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=bs, shuffle=False)
 
 learning_rate = 0.0001
-# This loss function works for multi-class classification
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -111,21 +113,6 @@ print(model)
 print(optimizer)
 print(criterion)
 print(f"Batch Size: {bs}")
-
-# Create a trial file for logs
-def create_trial_file(trials_folder="trials/four-class-model2"):
-    trial_number = 1
-    while os.path.exists(trials_folder + f"/trial_{trial_number}.txt"):
-        trial_number += 1
-    return trials_folder + f"/trial_{trial_number}.txt"
-
-trial_file = create_trial_file()
-
-with open(trial_file, "w") as f:
-    f.write(f"Model architecture: {model}\n")
-    f.write(f"Optimizer: {optimizer}\n")
-    f.write(f"Criterion: {criterion}\n")
-f.close()
 
 # Accuracy calculation function
 def calculate_metrics(y_pred, y_true):
@@ -147,10 +134,9 @@ def calculate_metrics(y_pred, y_true):
 
     return fp, tp, fn, tn, accuracy, precision, recall, specificity, f1
 
-# Training loop with detailed metrics tracked after each epoch
+# Training loop
 num_epochs = 50
 for epoch in range(num_epochs):
-    # Initialize metrics for the epoch
     train_metrics = {'accuracy': 0, 'precision': 0, 'recall': 0, 'specificity': 0, 'f1': 0}
     test_metrics = {'accuracy': 0, 'precision': 0, 'recall': 0, 'specificity': 0, 'f1': 0}
     
@@ -214,6 +200,5 @@ for epoch in range(num_epochs):
           f'Test Recall: {test_metrics["recall"]:.4f}, '
           f'Train F1 Score: {train_metrics["f1"]:.4f}, '
           f'Test F1 Score: {test_metrics["f1"]:.4f}')
-
-# Close the writer after training is complete
+    
 writer.close()

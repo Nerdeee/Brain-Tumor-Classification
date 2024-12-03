@@ -92,7 +92,7 @@ for epoch in range(num_epochs):
     epoch_accuracy = 0.0
     
     for batch_X, batch_Y in train_loader:
-        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
+        # batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
         optimizer.zero_grad()
         outputs = model(batch_X)
         loss = criterion(outputs, batch_Y)
